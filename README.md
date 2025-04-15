@@ -81,6 +81,11 @@ GoLive adalah aplikasi live streaming yang memungkinkan kamu untuk melakukan liv
    pm2 stop golive
    ```
 
+   ⛔ Bersihkan cache aplikasi
+   ```bash
+   pm2 flush golive
+   ```
+
 7. **Reset Password:**
    
    Jalankan perintah ini di terminal
