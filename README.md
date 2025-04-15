@@ -55,6 +55,7 @@ GoLive adalah aplikasi live streaming yang memungkinkan kamu untuk melakukan liv
 
    ```bash
    npm install
+   npm install fluent-ffmpeg
    ```
 
 6. **Jalankan Aplikasi:**
