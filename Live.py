@@ -9,6 +9,8 @@ import psutil
 import json
 import datetime
 import sqlite3
+import os
+import calendar
 
 DB_PATH = "live_data.db"
 
@@ -276,13 +278,20 @@ DASHBOARD_HTML = """
         });
     }
     setInterval(updateCountdowns, 1000);
+    // Tambahkan pengiriman offset timezone browser ke backend
+    function setTzOffset(form) {
+        var tz = new Date().getTimezoneOffset();
+        var tzInput = document.getElementById('tz_offset');
+        if (tzInput) tzInput.value = tz;
+        return true;
+    }
     </script>
 </head>
 <body>
     <div class="container">
         <header>
             <img src="{{ url_for('assets', filename='logo.png') }}" alt="Logo" class="logo">
-            <h1>Golive Dashboard</h1>
+            <h1>Golive</h1>
             <nav style="margin-left:auto;">
                 <button class="btn btn-primary" type="button" onclick="showSection('upload-section')">Upload</button>
                 <button class="btn btn-primary" type="button" onclick="showSection('addstream-section')">Add Live</button>
@@ -311,7 +320,7 @@ DASHBOARD_HTML = """
         </div>
         <div id="addstream-section" class="section card" style="display:none;">
             <h2>Start New Live</h2>
-            <form action="{{ url_for('start_live') }}" method="post" class="form-live">
+            <form action="{{ url_for('start_live') }}" method="post" class="form-live" onsubmit="return setTzOffset(this);">
                 <label>Title:<input type="text" name="title" required></label>
                 <label>Video:
                     <select name="video_file" required>
@@ -323,6 +332,10 @@ DASHBOARD_HTML = """
                 <label>Stream Key:<input type="text" name="stream_key" required></label>
                 <label>RTMP URL:<input type="text" name="rtmp_url" value="rtmp://a.rtmp.youtube.com/live2" required></label>
                 <label>Durasi (jam):<input type="number" name="duration" value="1" min="1" required></label>
+                <label>Schedule:
+                    <input type="datetime-local" name="schedule">
+                </label>
+                <input type="hidden" id="tz_offset" name="tz_offset" value="0">
                 <button class="btn btn-primary" type="submit">Start Live</button>
             </form>
         </div>
@@ -361,6 +374,14 @@ DASHBOARD_HTML = """
                             </span>
                         {% elif live['status'] == "Stopped" %}
                             00:00:00
+                        {% elif live['status'] == "Schedule" %}
+                            <span data-remaining="{{ live.get('remaining', 0) }}">
+                                {{ "%02d:%02d:%02d" % (
+                                    (live.get('remaining', 0) // 3600),
+                                    (live.get('remaining', 0) % 3600) // 60,
+                                    (live.get('remaining', 0) % 60)
+                                ) }}
+                            </span>
                         {% else %}
                             -
                         {% endif %}
@@ -370,6 +391,8 @@ DASHBOARD_HTML = """
                             <span class="badge badge-live">Running</span>
                         {% elif live['status'] == "Stopped" %}
                             <span class="badge badge-stopped">Stopped</span>
+                        {% elif live['status'] == "Schedule" %}
+                            <span class="badge badge-other">Schedule</span>
                         {% else %}
                             <span class="badge badge-other">{{ live['status'] }}</span>
                         {% endif %}
@@ -380,6 +403,10 @@ DASHBOARD_HTML = """
                             <button class="btn btn-danger" type="submit">Stop</button>
                         </form>
                         {% elif live['status'] == "Stopped" %}
+                        <form action="{{ url_for('delete_live', live_id=live_id) }}" method="post" style="display:inline;">
+                            <button class="btn btn-delete" type="submit">Delete</button>
+                        </form>
+                        {% elif live['status'] == "Schedule" %}
                         <form action="{{ url_for('delete_live', live_id=live_id) }}" method="post" style="display:inline;">
                             <button class="btn btn-delete" type="submit">Delete</button>
                         </form>
@@ -405,28 +432,31 @@ def assets(filename):
 @app.route("/", methods=["GET"])
 def dashboard():
     videos = [f.name for f in UPLOAD_FOLDER.glob("*") if f.is_file()]
-    lives = get_all_lives_from_db()
+    lives_db = get_all_lives_from_db()
     now = datetime.datetime.now()
- 
+
+    # Sinkronisasi LIVE_DATA dan lives_db
     for lid, info in LIVE_DATA.items():
+        # Hapus update status Schedule->Running di sini, karena status akan diubah oleh thread run_live saat waktunya tiba
         if info.get("process") and info["process"].poll() is not None:
             info["status"] = "Stopped"
             info["remaining"] = 0
             update_status_in_db(lid, "Stopped", 0)
         elif info.get("thread") and info["thread"].is_alive():
-            if info.get("status") != "Stopped":
+            if info.get("status") not in ["Stopped", "Schedule"]:
                 info["status"] = "Running"
             if info.get("end_time"):
                 remaining = int(info["end_time"] - now.timestamp())
                 info["remaining"] = max(0, remaining)
                 update_status_in_db(lid, info["status"], info["remaining"])
-  
-            lives[lid] = info
- 
+            lives_db[lid] = info  # update dari LIVE_DATA
+
+    # Gabungkan LIVE_DATA dan lives_db agar data tetap muncul setelah restart
     for lid, info in LIVE_DATA.items():
-        if lid not in lives and info.get("status") == "Running":
-            lives[lid] = info
-    return render_template_string(DASHBOARD_HTML, videos=videos, lives=lives, year=now.year)
+        if lid not in lives_db and info.get("status") == "Running":
+            lives_db[lid] = info
+
+    return render_template_string(DASHBOARD_HTML, videos=videos, lives=lives_db, year=now.year)
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -443,9 +473,68 @@ def start_live():
     stream_key = request.form["stream_key"]
     rtmp_url = request.form["rtmp_url"]
     duration = int(float(request.form["duration"]) * 3600)
+    schedule_str = request.form.get("schedule", "").strip()
     live_id = str(uuid.uuid4())
+
+    schedule_ts = None
+    status = "Running"
+    dt = None
+    if schedule_str:
+        try:
+            dt = datetime.datetime.strptime(schedule_str, "%Y-%m-%dT%H:%M")
+        except Exception:
+            try:
+                dt = datetime.datetime.strptime(schedule_str, "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                dt = None
+        if dt:
+            tz_offset_min = int(request.form.get("tz_offset", "0"))
+            tz = datetime.timezone(datetime.timedelta(minutes=-tz_offset_min))
+            dt_aware = dt.replace(tzinfo=tz)
+            schedule_ts = dt_aware.timestamp()
+            status = "Schedule"
+        else:
+            schedule_ts = None
+            status = "Running"
+
     def run_live():
+        if schedule_ts:
+            # Ensure LIVE_DATA entry exists before countdown (fix for gunicorn/restart/threaded mode)
+            if live_id not in LIVE_DATA:
+                LIVE_DATA[live_id] = {
+                    "title": title,
+                    "video_file": video_file,
+                    "stream_key": stream_key,
+                    "rtmp_url": rtmp_url,
+                    "duration": request.form["duration"],
+                    "thread": threading.current_thread(),
+                    "process": None,
+                    "status": status,
+                    "remaining": int(schedule_ts - time.time()),
+                    "start_time": schedule_ts,
+                    "end_time": schedule_ts + duration,
+                    "schedule": schedule_str if schedule_str else None
+                }
+                save_live_to_db(live_id, LIVE_DATA[live_id])
+            while True:
+                now = time.time()
+                wait_sec = int(schedule_ts - now)
+                if wait_sec <= 0:
+                    break
+                LIVE_DATA[live_id]["status"] = "Schedule"
+                LIVE_DATA[live_id]["remaining"] = wait_sec
+                update_status_in_db(live_id, "Schedule", wait_sec)
+                save_live_to_db(live_id, LIVE_DATA[live_id])
+                time.sleep(1)
+            # Update status to Running before starting
+            LIVE_DATA[live_id]["status"] = "Running"
+            LIVE_DATA[live_id]["remaining"] = duration
+            LIVE_DATA[live_id]["start_time"] = time.time()
+            LIVE_DATA[live_id]["end_time"] = LIVE_DATA[live_id]["start_time"] + duration
+            update_status_in_db(live_id, "Running", duration)
+            save_live_to_db(live_id, LIVE_DATA[live_id])
         start_stream_flask(title, video_file, stream_key, rtmp_url, duration, live_id)
+
     t = threading.Thread(target=run_live, daemon=True)
     LIVE_DATA[live_id] = {
         "title": title,
@@ -455,10 +544,11 @@ def start_live():
         "duration": request.form["duration"],
         "thread": t,
         "process": None,
-        "status": "Running",
-        "remaining": duration,
-        "start_time": time.time(),
-        "end_time": time.time() + duration
+        "status": status,
+        "remaining": int(schedule_ts - time.time()) if schedule_ts and status == "Schedule" else duration,
+        "start_time": schedule_ts if schedule_ts else time.time(),
+        "end_time": (schedule_ts if schedule_ts else time.time()) + duration,
+        "schedule": schedule_str if schedule_str else None
     }
     save_live_to_db(live_id, LIVE_DATA[live_id])
     t.start()
@@ -504,5 +594,63 @@ def cpu_usage():
         "net_recv": round(net.bytes_recv / 1024 / 1024, 2)
     }
 
+def schedule_live_from_db():
+    lives_db = get_all_lives_from_db()
+    for lid, info in lives_db.items():
+        if info.get("status") == "Schedule" and info.get("schedule"):
+            def run_live(live_id=lid, info=info):
+                try:
+                    schedule_str = info.get("schedule")
+                    duration = int(float(info.get("duration", 1)) * 3600)
+                    title = info.get("title")
+                    video_file = info.get("video_file")
+                    stream_key = info.get("stream_key")
+                    rtmp_url = info.get("rtmp_url")
+                    schedule_ts = None
+                    dt = None
+                    try:
+                        dt = datetime.datetime.strptime(schedule_str, "%Y-%m-%dT%H:%M")
+                    except Exception:
+                        try:
+                            dt = datetime.datetime.strptime(schedule_str, "%Y-%m-%dT%H:%M:%S")
+                        except Exception:
+                            dt = None
+                    if dt:
+                        tz_offset_min = int(info.get("tz_offset", 0))
+                        tz = datetime.timezone(datetime.timedelta(minutes=-tz_offset_min))
+                        dt_aware = dt.replace(tzinfo=tz)
+                        schedule_ts = dt_aware.timestamp()
+                    if schedule_ts:
+                        if live_id not in LIVE_DATA:
+                            LIVE_DATA[live_id] = dict(info)
+                        while True:
+                            now = time.time()
+                            wait_sec = int(schedule_ts - now)
+                            if wait_sec <= 0:
+                                break
+                            if live_id not in LIVE_DATA:
+                                LIVE_DATA[live_id] = dict(info)
+                            LIVE_DATA[live_id]["status"] = "Schedule"
+                            LIVE_DATA[live_id]["remaining"] = wait_sec
+                            update_status_in_db(live_id, "Schedule", wait_sec)
+                            save_live_to_db(live_id, LIVE_DATA[live_id])
+                            time.sleep(1)
+                    LIVE_DATA[live_id]["status"] = "Running"
+                    LIVE_DATA[live_id]["remaining"] = duration
+                    LIVE_DATA[live_id]["start_time"] = time.time()
+                    LIVE_DATA[live_id]["end_time"] = LIVE_DATA[live_id]["start_time"] + duration
+                    update_status_in_db(live_id, "Running", duration)
+                    save_live_to_db(live_id, LIVE_DATA[live_id])
+                    start_stream_flask(title, video_file, stream_key, rtmp_url, duration, live_id)
+                except Exception:
+                    pass
+            if lid not in LIVE_DATA:
+                LIVE_DATA[lid] = dict(info)
+            t = threading.Thread(target=run_live, daemon=True)
+            LIVE_DATA[lid]["thread"] = t
+            LIVE_DATA[lid]["process"] = None
+            t.start()
+
 if __name__ == "__main__":
+    schedule_live_from_db()
     app.run(host="0.0.0.0", port=5000, debug=False)
