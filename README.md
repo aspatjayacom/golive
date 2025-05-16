@@ -33,7 +33,9 @@ cd golive && nohup gunicorn -w 1 -b 0.0.0.0:5000 Live:app & tail -f nohup.out
 
 Akses dashboard di browser:
 
+```sh
 ip-vps:5000
+```
 
 STOP script streaming panel (dashboard web):
 
