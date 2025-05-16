@@ -17,7 +17,7 @@ cd golive
 ## Install gunicorn
 
 ```sh
-apt install python3-gunicorn
+apt install gunicorn
 ```
 
 ## Menjalankan Dashboard Web
