@@ -241,6 +241,166 @@ rm db/*.db
 
 Restart aplikasi untuk create database baru.
 
+## 🛠️ Instalasi di STB
+
+### 1. Persiapan STB
+
+Edit Config:
+
+```bash
+sudo nano /etc/apt/sources.list.d/armbian-config.sources
+```
+
+edit jadi:
+
+```bash
+Types: deb
+#URIs: https://github.armbian.com/configng
+Suites: stable
+Components: main
+#Signed-By: /usr/share/keyrings/armbian.gpg
+```
+
+Simpan Perubahan dan Keluar dari nano:
+
+Tekan Ctrl + O (untuk "Write Out" atau menyimpan).
+Tekan Enter untuk mengkonfirmasi nama file.
+Tekan Ctrl + X (untuk keluar).
+
+```bash
+sudo rm /etc/apt/sources.list.d/armbian-config.sources
+```
+
+Update sistem:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+Edit Firewall:
+
+```bash
+sudo apt install ufw -y
+sudo ufw allow 7575
+sudo ufw allow 22
+sudo ufw allow 1935
+sudo ufw allow 443
+sudo ufw allow 80
+sudo ufw enable
+```
+Cek Status Port:
+
+```bash
+sudo ufw status
+```
+
+Install Node.js:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+```
+
+```bash
+sudo apt-get install -y nodejs
+```
+
+Verifikasi instalasi Node.js:
+
+```bash
+node --version
+npm --version
+```
+
+Install FFmpeg:
+
+```bash
+sudo apt install ffmpeg -y
+```
+
+Verifikasi FFmpeg:
+```bash
+ffmpeg -version
+```
+
+Install Git:
+
+```bash
+sudo apt install git -y
+```
+
+### 2. Setup Projek GoLive
+
+Clone repository ke STB:
+
+```bash
+git clone https://github.com/aspatjayacom/golive
+```
+
+Masuk ke folder project:
+
+```bash
+cd golive
+```
+Fix permission untuk folder uploads:
+
+```bash
+chmod -R 755 public/uploads/
+```
+Install dependencies:
+
+```bash
+npm install
+```
+
+Generate session secret:
+
+```bash
+npm run generate-secret
+```
+
+**Konfigurasi tambahan (opsional):**
+
+Port default aplikasi adalah **7575**. Jika perlu ubah port, edit file [.env](.env) (contoh: 8080, 3300, dll):
+
+```bash
+nano .env
+```
+
+### 4. Install Process Manager (PM2)
+
+Install PM2:
+
+```bash
+sudo npm install -g pm2
+```
+
+### 5. Cara Jalankan Aplikasi GoLive
+
+Pastikan kamu masih berada di folder **golive**, jalankan perintah ini:
+
+```bash
+pm2 start app.js --name golive
+pm2 startup
+pm2 save
+```
+
+Akses aplikasi di <b>IP_SERVER:PORT</b><br>
+Contoh:
+
+```bash
+88.12.34.56:7575
+```
+
+Buat username dan password. Setelah masuk Dashboard, **Sign Out**. Lalu restart aplikasi dengan:
+
+```bash
+pm2 restart golive
+```
+
+cek status memori/hdd:
+
+```bash
+df -h
+```
 ## Lisensi:
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/aspatjayacom/golive/blob/main/LICENSE)
