@@ -1,4 +1,4 @@
-![logo](https://github.com/user-attachments/assets/50231124-d546-43cb-9cf4-7a06a1dad5bd)
+![logo](https://raw.githubusercontent.com/aspatjayacom/golive/d364f8a75feb9df96f12c452f80c8c0671e83cf6/public/images/logo_mobile.svg)
 
 # GoLive v2.0: Fresh From The Oven🔥
 
