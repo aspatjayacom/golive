@@ -4,8 +4,6 @@
 
 GoLive adalah aplikasi live streaming yang memungkinkan kamu untuk melakukan live streaming ke berbagai platform seperti YouTube, Facebook, dan platform lainnya menggunakan protokol RTMP. Aplikasi ini bisa berjalan di VPS (Virtual Private Server) dan mendukung streaming ke banyak platform sekaligus.
 
-![Untitled-2](https://github.com/user-attachments/assets/3d7bb367-a1b2-43a5-839b-b6aa8dd5de90)
-
 ## 🚀 Fitur Utama
 
 - **Multi-Platform Streaming**: Mendukung streaming ke berbagai platform populer
