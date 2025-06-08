@@ -243,6 +243,16 @@ Restart aplikasi untuk create database baru.
 
 ### 1. Persiapan STB
 
+Pindah Armbian ke eMMC/internal storage:
+
+```bash
+sudo armbian-config
+```
+
+Pilih opsi "System" atau "Install" dari menu utama.
+Cari opsi Storage lalu "Install" atau "Boot from eMMC - system on eMMC".
+masukkan id dtb sesuai STB dan format ext4
+
 Edit Config:
 
 ```bash
