@@ -1482,7 +1482,7 @@ app.get('/api/server-time', (req, res) => {
 });
 app.listen(port, '0.0.0.0', async () => {
   const ipAddresses = getLocalIpAddresses();
-  console.log(`StreamFlow running at:`);
+  console.log(`GoLive running at:`);
   if (ipAddresses && ipAddresses.length > 0) {
     ipAddresses.forEach(ip => {
       console.log(`  http://${ip}:${port}`);
