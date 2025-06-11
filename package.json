@@ -1,5 +1,5 @@
 {
-  "name": "streamflow",
+  "name": "golive",
   "version": "2.0.0",
   "description": "Cloud streaming solution with FFmpeg",
   "main": "app.js",  
