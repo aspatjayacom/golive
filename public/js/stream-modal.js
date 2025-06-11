@@ -1,11 +1,11 @@
 /*
- * StreamFlow v2.0 - Live Streaming Lewat VPS
+ * GoLive v2.0 - Multi Live Streaming Panel
  * 
  * Custom Features & UI Components
- * Created by: Bang Tutorial
- * GitHub: https://github.com/bangtutorial
+ * Created by: Mirza Dev
+ * GitHub: https://github.com/aspatjayacom
 
- * © 2025 Bang Tutorial - All rights reserved
+ * © 2025 Mirza Dev - All rights reserved
  */
 
 let selectedVideoData = null;
