@@ -43,7 +43,7 @@ sudo ufw --force enable
 echo "🚀 Installing PM2..."
 sudo npm install -g pm2
 
-echo "▶️ Starting StreamFlow..."
+echo "▶️ Starting GoLive..."
 pm2 start app.js --name golive
 pm2 startup
 pm2 save
