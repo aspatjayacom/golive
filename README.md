@@ -22,7 +22,17 @@ GoLive adalah aplikasi live streaming yang memungkinkan kamu untuk melakukan liv
 - **VPS/Server** dengan minimal 1Core & 1GB RAM
 - **Port** 7575 (dapat diubah di [.env](.env))
 
-## 🛠️ Instalasi di VPS
+# 🛠️ Instalasi di VPS
+
+## 🚀 Quick Installation
+
+Untuk instalasi otomatis, jalankan perintah berikut:
+
+```bash
+curl -o install.sh https://raw.githubusercontent.com/aspatjayacom/golive/refs/heads/main/install.sh && chmod +x install.sh && ./install.sh
+```
+
+## 🔧 Manual Installation
 
 ### 1. Persiapan VPS
 
@@ -239,9 +249,9 @@ rm db/*.db
 
 Restart aplikasi untuk create database baru.
 
-## 🛠️ Instalasi di STB
+# 🛠️ Instalasi di STB
 
-### 1. Persiapan STB
+## 1. Persiapan STB
 
 Pindah Armbian ke eMMC/internal storage:
 
@@ -278,6 +288,14 @@ Tekan Ctrl + X (untuk keluar).
 ```bash
 sudo rm /etc/apt/sources.list.d/armbian-config.sources
 ```
+## 🚀 Quick Installation
+
+Untuk instalasi otomatis, jalankan perintah berikut:
+
+```bash
+curl -o installstb.sh https://raw.githubusercontent.com/aspatjayacom/golive/refs/heads/main/installstb.sh && chmod +x installstb.sh && ./installstb.sh
+```
+## Installation Manual
 
 Update sistem:
 
